@@ -1,8 +1,6 @@
 import fastapi
 import uvicorn
-
-from predapi.models import Image
-from predapi.cnn import SimpleCNN
+import tensorflow as tf
 
 app = fastapi.FastAPI(
     title="Predict API",
@@ -10,18 +8,20 @@ app = fastapi.FastAPI(
     version="0.1",
     docs_url="/",
 )
-cnn_obj = SimpleCNN(8, 2, 2)
 
 
-@app.get("/predict")
-def predict(image: Image):
-    return {"class": Image.text}
+@app.post("/predict")
+async def predict(X):
+    model = app.state.model
+    prediction = model.predict(X)
+    return {"prediction": prediction}
 
 
 @app.on_event("startup")
 def load_model():
-    model_path = "model.h5"
-    cnn_obj.load_model(model_path)
+    model_file_path = "predapi/model.h5"
+    model = tf.keras.models.load_model(model_file_path)
+    app.state.model = model
 
 
 if __name__ == "__main__":
