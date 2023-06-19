@@ -1,5 +1,6 @@
 import numpy as np
 from tensorflow.keras.utils import to_categorical
+from pydantic import BaseSettings
 
 from sklearn.model_selection import train_test_split
 
@@ -7,11 +8,39 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 
 
+def load_data(file_path, test_size=0.2, random_state=42):
+    X, y = np.load(file_path, allow_pickle=True).T
+
+    X = np.asarray([x.reshape(20, 20) for x in X], dtype=np.float32)
+    y = np.asarray(y, dtype=np.int32)
+    y = to_categorical(y)
+
+    train_data, test_data, train_labels, test_labels = train_test_split(
+        X, y, test_size=test_size, random_state=random_state
+    )
+
+    val_data, test_data, val_labels, test_labels = train_test_split(
+        test_data, test_labels, test_size=0.5, random_state=42
+    )
+
+    return train_data, train_labels, test_data, test_labels, val_data, val_labels
+
+
+class ModelConfig(BaseSettings):
+    num_filters: int
+    filter_size: int
+    pool_size: int
+
+
+class TrainConfig(BaseSettings):
+    epochs: int
+
+
 class SimpleCNN:
-    def __init__(self, num_filters, filter_size, pool_size):
-        self.num_filters = num_filters
-        self.filter_size = filter_size
-        self.pool_size = pool_size
+    def __init__(self, config: ModelConfig):
+        self.num_filters = config.num_filters
+        self.filter_size = config.filter_size
+        self.pool_size = config.pool_size
         self.model = self.build_model()
 
     def build_model(self):
@@ -36,39 +65,41 @@ class SimpleCNN:
         )
         return model
 
-    def train(self, train_data, train_labels, epochs):
-        self.model.fit(train_data, train_labels, epochs=epochs)
+    def train(
+        self, train_data, train_labels, val_data, val_labels, config: TrainConfig
+    ):
+        epochs = config.epochs
+        self.model.fit(
+            train_data,
+            train_labels,
+            epochs=epochs,
+            validation_data=(val_data, val_labels),
+        )
 
     def save_model(self, file_path):
         self.model.save(file_path)
 
 
-# from utils import load_data
-
-
 def main():
-    num_filters = 8
-    filter_size = 2
-    pool_size = 2
+    config = ModelConfig(num_filters=8, filter_size=2, pool_size=2)
+    train_config = TrainConfig(
+        epochs=50,
+    )
+    cnn_object = SimpleCNN(config=config)
 
-    # Create an instance of SimpleCNN
-    cnn_object = SimpleCNN(num_filters, filter_size, pool_size)
+    train_data, train_labels, test_data, test_labels, val_data, val_labels = load_data(
+        "data.npy"
+    )
 
-    # Load your training data and labels
-    # data = load_data("data.npy")
-    # train_data = ...
-    # train_labels = ...
-    # test_data = ...
-    # test_labels = ...
-    # X = np.asarray([x.reshape(20, 20) for x in X], dtype=np.float32)
-    # y = np.asarray(y, dtype=np.int32)
+    cnn_object.train(
+        train_data, train_labels, val_data, val_labels, config=train_config
+    )
 
-    # Train the model
-    epochs = 10
-    cnn_object.train(train_data, train_labels, epochs)
+    accuracy = cnn_object.model.evaluate(test_data, test_labels)[1]
+    print("Test accuracy:", accuracy)
 
-    # Save the model
-    model_file_path = "path/to/save/model.h5"
+    # write to file
+    model_file_path = "model.h5"
     cnn_object.save_model(model_file_path)
 
 
