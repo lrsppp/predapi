@@ -34,6 +34,6 @@ if __name__ == "__main__":
     parser.add_argument("--n", type=int, default=200)
     parser.add_argument("--n_classes", type=int, default=2)
     parser.add_argument("--n_per_image", type=int, default=500)
-    parser.add_argument("--output", type=str, default="data.npy")
+    parser.add_argument("--output", type=str, default="../data/data.npy")
 
     main(parser.parse_args())
